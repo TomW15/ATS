@@ -5,9 +5,7 @@ import os
 os.chdir(r'/Users/mihne/Desktop/MSc/Summer Term/ATS/Backtesting') # Change Directory
 
 # Get commodities and sectors data
-
 cmdty = pd.read_excel("Commodity Data.xlsx", sheet_name = "Return indices").set_index("date")
-sectors = pd.read_excel("Commodity Data.xlsx", sheet_name = "Assets")
 
 # Calculate daily returns
 try:
@@ -16,18 +14,18 @@ except FileNotFoundError:
     returns = cmdty/cmdty.shift(1)
     returns.to_csv("Commodity_Returns.csv")
 
-lastIndex = cmdty.shape[0] - 1  #Get index number of last observation
+lastIndex = cmdty.shape[0]  #Get index number of last observation
 
-# Commodity Market Factor (CMF)
-CMF = pd.DataFrame(columns = ['CMF Prices', 'CMF Returns'], index = returns.index.copy())
+# Create empty dataframe to store Commodity Market Factor (CMF) data
+CMF = pd.DataFrame(columns = ['CMF Returns'], index = returns.index.copy())
 
-## CMF Prices
-for i in range(0,lastIndex+1):
-    non_zero_prices = non_zero_prices = cmdty.iloc[i][cmdty.iloc[i].notnull()]
-    CMF.iloc[i]['CMF Prices'] = (non_zero_prices).mean() 
+# CMF Returns
+for i in range(0,lastIndex):
+    non_zero_returns = returns.iloc[i][returns.iloc[i].notnull()]
+    CMF.iloc[i]['CMF Returns'] = (non_zero_returns).mean()  # Commodity Market Factor = equal weighted return of all commodities traded during a single day
 
-## CMF Returns
-CMF["CMF Returns"] = CMF["CMF Prices"]/CMF["CMF Prices"].shift(1)
+# CMF Prices (Derive commodity market factor price implied by the cumulative returns of the underlying commodities - series starts at 100.00)
+CMF['CMF Prices'] = CMF.cumprod()*100
 
 # Create empty dataframe to store CMF summary stats 
 summary_stats_CMF = pd.DataFrame(columns = ['CMF'], 
@@ -36,11 +34,11 @@ summary_stats_CMF = pd.DataFrame(columns = ['CMF'],
                                     'MDD (%)', 'Peak Date', 'Trough Date', 'Inv. Calmar Ratio'])
 
 # Number of Observations
-summary_stats_CMF.loc['No Obs'] = CMF['CMF Prices'].count()
+summary_stats_CMF.loc['No Obs'] = CMF['CMF Returns'].count()
 
-# Total Return
-summary_stats_CMF.loc['Tot Ret (%)'] = ((CMF["CMF Prices"].iloc[lastIndex] - CMF["CMF Prices"].iloc[0]) / CMF["CMF Prices"].iloc[0])*100
-        
+# Total Return (cumulative)
+summary_stats_CMF.loc['Tot Ret (%)'] = ((CMF['CMF Returns'].cumprod().iloc[lastIndex-1])-1)*100
+
 # Date of first observation
 summary_stats_CMF.loc['First Obs Date'] = CMF.loc[CMF['CMF Prices'].first_valid_index()].name
         
@@ -91,9 +89,5 @@ summary_stats_CMF.loc['MDD (%)'] = summary_stats_CMF.loc['MDD (%)'].apply(lambda
 summary_stats_CMF.loc['Inv. Calmar Ratio'] = summary_stats_CMF.loc['Inv. Calmar Ratio'].apply(lambda x : round(x,2))
 
 print(summary_stats_CMF)
-
 # Export transposed summary stats dataframe to csv
 (summary_stats_CMF.T).to_csv('CMF_Stats_Final.csv')
-
-
-
